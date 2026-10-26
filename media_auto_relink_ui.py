@@ -242,10 +242,17 @@ def review_window(fusion, bmd, rows, workspace):
         if not root.is_dir():
             widgets["Details"].Text = "Selected folder is unavailable."
             return
+        needed = {str(rows[ix]["name"]).casefold() for ix in targets}
         matches = {}
-        for current, dirs, files in os.walk(str(root), followlinks=False):
-            for filename in files:
-                matches.setdefault(filename.casefold(), []).append(Path(current) / filename)
+        try:
+            for current, dirs, files in os.walk(str(root), followlinks=False):
+                for filename in files:
+                    key = filename.casefold()
+                    if key in needed:
+                        matches.setdefault(key, []).append(Path(current) / filename)
+        except OSError as error:
+            widgets["Details"].Text = "Unable to search selected folder: " + str(error)
+            return
         matched, ambiguous = 0, 0
         for ix in targets:
             row = rows[ix]
