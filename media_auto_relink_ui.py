@@ -1,11 +1,11 @@
 """Native Fusion UI review dialog for Media Auto Relink."""
-def review_window(fusion, rows, workspace):
+def review_window(fusion, bmd, rows, workspace):
     """Return approved row indices, or None if cancelled.
 
     All changes are staged. No relinking happens inside the dialog.
     """
     ui = fusion.UIManager
-    dispatcher = __import__("bmd").UIDispatcher(ui)
+    dispatcher = bmd.UIDispatcher(ui)
     win = dispatcher.AddWindow(
         {"ID": "MARReview", "WindowTitle": "Media Auto Relink — Review",
          "Geometry": [100, 100, 1120, 680], "MinimumSize": [780, 460]},
@@ -50,7 +50,7 @@ def review_window(fusion, rows, workspace):
         entry.Text[2] = row["name"]
         entry.Text[3] = row.get("original") or ""
         entry.Text[4] = row.get("expected") or ""
-        if row["status"] == "ready":
+        if row["status"] in ("ready", "suggested_review"):
             entry.Text[0] = "Exact"
         elif row["status"] in ("already_online",):
             entry.Text[0] = "Online"
@@ -86,7 +86,7 @@ def review_window(fusion, rows, workspace):
             return
         row = rows[ix]
         # Do not offer approval when an exact target does not exist.
-        if choice == "confirm" and row["status"] != "ready":
+        if choice == "confirm" and row["status"] not in ("ready", "suggested_review"):
             items["Details"].Text = ("Cannot confirm this entry: no verified target path. "
                                      "Relink it manually or correct its folder structure.\n"
                                      + str(row.get("original") or ""))
