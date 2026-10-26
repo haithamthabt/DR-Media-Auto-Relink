@@ -224,11 +224,21 @@ def main():
     if approved is None:
         print("Review cancelled. No files were relinked.")
     else:
-        approved_ids = {id(rows[ix]) for ix in approved if 0 <= ix < len(rows)}
-        for folder, entries in sorted(groups.items()):
-            selected = [e for e in entries if id(e[1]) in approved_ids]
-            if not selected:
+        approved_ids = {ix for ix in approved if isinstance(ix, int) and 0 <= ix < len(rows)}
+        # Rebuild groups from the reviewed rows, including newly located media.
+        apply_groups = {}
+        for ix in approved_ids:
+            row = rows[ix]
+            if row["status"] not in ("ready", "suggested_review", "located_review"):
                 continue
+            expected = Path(row.get("expected") or "")
+            if not expected.is_file():
+                row["status"] = "expected_file_missing"
+                continue
+            apply_groups.setdefault(str(expected.parent), []).append(
+                (items[ix], row, expected, row.get("original", ""))
+            )
+        for folder, selected in sorted(apply_groups.items()):
             try:
                 success = bool(pool.RelinkClips([e[0] for e in selected], folder))
             except Exception as exc:
@@ -239,7 +249,7 @@ def main():
                 row["status"] = (report_status(item, expected, original)
                                  if success else "api_relink_failed")
         for ix, row in enumerate(rows):
-            if row["status"] in ("ready", "suggested_review"):
+            if ix not in approved_ids and row["status"] in ("ready", "suggested_review", "located_review"):
                 row["status"] = "skipped_or_not_confirmed"
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
