@@ -73,7 +73,6 @@ def review_window(fusion, bmd, rows, workspace):
     decisions = {}
     entry_map = {}
     displayed = []
-    selected_cache = set()
     filter_choices = ["All files", "Needs review", "Exact matches", "Not found / other", "Already linked", "Approved", "Excluded"]
     sort_choices = ["Status", "Decision", "Filename", "Original path", "Suggested path"]
     for label in filter_choices:
@@ -115,7 +114,6 @@ def review_window(fusion, bmd, rows, workspace):
 
     def fill_table():
         # Rebuild on filter or sort changes; decisions remain keyed to original indices.
-        selected_cache.clear()
         tree.Clear()
         entry_map.clear()
         displayed[:] = sorted((ix for ix in range(len(rows)) if included(ix)), key=order_key)
@@ -131,24 +129,21 @@ def review_window(fusion, bmd, rows, workspace):
             entry_map[ix] = entry
 
     def selected_indices():
-        # Fusion UIManager exposes SelectedItems as a property on macOS,
-        # not necessarily a method. Preserve the selection when a button
-        # temporarily takes focus away from the tree.
+        """Use only the Tree's current highlighted selection; never accumulate clicks."""
         try:
-            attr = tree.SelectedItems
-            selected = attr() if callable(attr) else attr
-            if selected:
-                found = []
-                for item in selected:
-                    position = tree.IndexOfTopLevelItem(item)
-                    if isinstance(position, int) and 0 <= position < len(displayed):
-                        found.append(displayed[position])
-                if found:
-                    selected_cache.clear()
-                    selected_cache.update(found)
+            prop = tree.SelectedItems
+            selected = prop() if callable(prop) else prop
+            found = []
+            for item in (selected or []):
+                index = tree.IndexOfTopLevelItem(item)
+                if isinstance(index, int) and 0 <= index < len(displayed):
+                    original = displayed[index]
+                    if original not in found:
+                        found.append(original)
+            return found
         except Exception as error:
-            print("Unable to read table selection:", error)
-        return sorted(selected_cache)
+            print("Unable to read visible selection:", error)
+            return []
 
     def refresh():
         exact = sum(row["status"] == "ready" for row in rows)
@@ -185,26 +180,17 @@ def review_window(fusion, bmd, rows, workspace):
                                        "They will remain untouched." % rejected)
 
     def on_select(event):
-        # Click event provides a fallback when selection property is empty.
-        if isinstance(event, dict):
-            item = event.get("item")
-            if item is not None:
-                try:
-                    position = tree.IndexOfTopLevelItem(item)
-                    if isinstance(position, int) and 0 <= position < len(displayed):
-                        selected_cache.add(displayed[position])
-                except Exception:
-                    pass
         indices = selected_indices()
         if not indices:
+            widgets["Details"].Text = "No highlighted rows. Select rows in the table first."
             return
         if len(indices) > 1:
-            widgets["Details"].Text = "%d files selected. Approve or leave these files for manual relinking." % len(indices)
+            widgets["Details"].Text = "%d highlighted files. Actions affect only these highlighted rows." % len(indices)
         else:
             row = rows[indices[0]]
             widgets["Details"].Text = ("Original: " + str(row.get("original") or "(unavailable)") +
-                "\nLocal: " + str(row.get("expected") or "(no candidate; manual relink needed)") +
-                "\nReason: " + match_label(row))
+                "\\nLocal: " + str(row.get("expected") or "(no candidate; manual relink needed)") +
+                "\\nReason: " + match_label(row))
 
     def on_confirm(event):
         update_choice("confirm")
