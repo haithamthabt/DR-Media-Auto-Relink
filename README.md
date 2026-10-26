@@ -27,12 +27,22 @@ A clip from another project is handled the same way. Media in shared folders als
 
 ## Install
 
-1. Download `MediaAutoRelink.py`, `media_auto_relink_core.py`, and `media_auto_relink_ui.py` into the same directory.
-2. Place those files in Resolve's **Utility Scripts** directory. On macOS this is typically `/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility/`. Create the directory if needed; installations may vary.
-3. Restart DaVinci Resolve and open the imported project.
-4. Use **Workspace > Scripts > MediaAutoRelink** (menu location varies by Resolve version).
-5. On first use, choose your **Workspace Folder** in Resolve's folder picker.
-6. Use the native review window to confirm individual proposed matches, skip others, or select **Confirm All Exact**. Only **Apply Confirmed Relinks** starts relinking. Cancel changes nothing.
+The installed plugin folder contains **exactly two items**:
+
+```text
+Media Auto Relink/
+├── MediaAutoRelink.py
+└── modules/
+    ├── __init__.py
+    ├── media_auto_relink_core.py
+    └── media_auto_relink_ui.py
+```
+
+Copy the `Media Auto Relink` folder into your existing DaVinci Resolve `Fusion/Scripts/Utility/` location (inside any personal organizational folder if you use one). There is no required parent-folder name.
+
+**Important:** Remove old top-level copies of `media_auto_relink_core.py` and `media_auto_relink_ui.py` from the installed plugin folder. Keep both modules inside `modules/`. Only `MediaAutoRelink.py` belongs at the plugin's top level.
+
+Restart Resolve, open your project, and run the `MediaAutoRelink` entry from **Workspace > Scripts**. Choose your local Workspace Folder if prompted. Review candidate matches; nothing changes until **Apply Approved Files**. The script does not automatically save the Resolve project.
 
 If file dialogs are unavailable in the embedded Python environment, edit `~/.media-auto-relink/config.json` manually, e.g.:
 
@@ -77,7 +87,7 @@ MIT. See [LICENSE](LICENSE).
 
 ## Version 0.2 review window
 
-The bundled `media_auto_relink_ui.py` displays a native Resolve/Fusion review window. Select a clip to inspect its original and proposed paths, then click **Confirm Selected**, **Skip Selected**, or **Confirm All Exact**. **Apply Confirmed Relinks** performs relinking for approved entries only. **Cancel** exits without applying changes. Matches with missing targets cannot be confirmed. A proposed candidate with a differently named project folder always requires individual approval.
+The bundled `modules/media_auto_relink_ui.py` displays a native Resolve/Fusion review window. Select a clip to inspect its original and proposed paths, then click **Confirm Selected**, **Skip Selected**, or **Confirm All Exact**. **Apply Confirmed Relinks** performs relinking for approved entries only. **Cancel** exits without applying changes. Matches with missing targets cannot be confirmed. A proposed candidate with a differently named project folder always requires individual approval.
 
 **Testing status:** The window and scripting integration are committed but have not been run inside the user's Resolve installation. API or event adjustments may be needed depending on installed Resolve version. When the dialog is unavailable, the script reports the problem and does not relink clips.
 
@@ -98,7 +108,7 @@ This native UI code still needs validation in a running Resolve installation; it
 
 ### Bulk review and sorting (v0.2.2)
 
-Use **Show: Needs review** to display only proposed matches requiring approval. **Approve Shown Matches** stages every visible file with an existing suggested or exact destination. Select an individual row and choose **Undo Selected** to remove its approval (or **Exclude Selected** to leave it for manual relinking). **Apply Approved Files** changes only approved items. The **Show** dropdown can also filter exact paths, missing/other, online, approved, and excluded items. The **Sort** dropdown orders by status, decision, filename, original path, or suggested path. Changing filters or sorting does not discard prior choices. No full-disk scan is performed.
+Use **Show: Needs review** to display only proposed matches requiring approval. **Approve Shown Matches** stages every visible file with an existing suggested or exact destination. Select an individual row and choose **Undo Selected** to remove its approval (or **Exclude Selected** to leave it for manual relinking). **Apply Approved Files** changes only approved items. The **Show** dropdown can also filter exact paths, missing/other, online, approved, and excluded items. Click a table column header to sort by decision, match, filename, original path, or suggested path. Changing filters or sorting does not discard prior choices. No full-disk scan is performed.
 
 Note: Files without a valid suggested path cannot be approved from this dialog; they remain available for manual relinking.
 
