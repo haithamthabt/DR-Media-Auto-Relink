@@ -230,7 +230,7 @@ def review_window(fusion, bmd, rows, workspace):
         chosen = selected_indices()
         targets = chosen if chosen else [
             ix for ix in displayed
-            if rows[ix]["status"] not in ("ready", "already_online", "suggested_review", "located_review")
+            if rows[ix]["status"] not in ("ready", "already_online", "suggested_review", "located_review", "original_path_unavailable")
         ]
         if not targets:
             widgets["Details"].Text = "Select missing files or choose Show: Not found / other."
@@ -249,7 +249,7 @@ def review_window(fusion, bmd, rows, workspace):
         matched, ambiguous = 0, 0
         for ix in targets:
             row = rows[ix]
-            if row["status"] in ("ready", "already_online", "suggested_review", "located_review"):
+            if row["status"] in ("ready", "already_online", "suggested_review", "located_review", "original_path_unavailable"):
                 continue
             candidates = matches.get(str(row["name"]).casefold(), [])
             if len(candidates) == 1:
