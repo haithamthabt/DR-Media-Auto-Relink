@@ -1,148 +1,164 @@
-"""Native Fusion UI review dialog for Media Auto Relink."""
-def review_window(fusion, bmd, rows, workspace):
-    """Return approved row indices, or None if cancelled.
+"""Compact native Fusion UI review for Media Auto Relink.
 
-    All changes are staged. No relinking happens inside the dialog.
-    """
+All choices are staged. Apply only passes explicitly approved indices to caller.
+"""
+
+def review_window(fusion, bmd, rows, workspace):
     ui = fusion.UIManager
     dispatcher = bmd.UIDispatcher(ui)
     win = dispatcher.AddWindow(
         {"ID": "MARReview", "WindowTitle": "Media Auto Relink — Review",
-         "Geometry": [100, 100, 1120, 680], "MinimumSize": [780, 460]},
-        ui.VGroup([
-            ui.HGroup([
+         "Geometry": [100, 100, 1200, 720], "MinimumSize": [850, 540]},
+        ui.VGroup({"Spacing": 6, "Margin": 10}, [
+            ui.HGroup({"Weight": 0, "Spacing": 8}, [
                 ui.Label({"ID": "WorkspaceLabel", "Text": "Workspace: " + str(workspace), "Weight": 1}),
-                ui.Button({"ID": "CloseButton", "Text": "Cancel"})
+                ui.Button({"ID": "CloseButton", "Text": "Cancel", "MaximumSize": [90, 30]})
             ]),
-            ui.Label({"ID": "Summary", "Text": "Review matches before applying."}),
-            ui.Tree({"ID": "Matches", "Weight": 1, "SortingEnabled": False,
-                     "AlternatingRowColors": True}),
-            ui.Label({"ID": "Details", "Text": "Select a row to inspect its original and proposed paths.", "WordWrap": True}),
-            ui.HGroup([
-                ui.Button({"ID": "Confirm", "Text": "Confirm Selected"}),
-                ui.Button({"ID": "Skip", "Text": "Skip Selected"}),
-                ui.Button({"ID": "ConfirmExact", "Text": "Confirm All Exact"}),
-                ui.Button({"ID": "Reset", "Text": "Reset Selected"})
+            ui.Label({"ID": "Summary", "Text": "", "Weight": 0, "MaximumSize": [1100, 28]}),
+            ui.Label({"ID": "Hint", "Text": "Select one or more rows (Cmd-click / Shift-click), then Approve or Leave for manual relinking.",
+                      "Weight": 0, "MaximumSize": [1100, 25]}),
+            ui.Tree({"ID": "Matches", "Weight": 1, "SelectionMode": "ExtendedSelection",
+                     "SortingEnabled": False, "AlternatingRowColors": True}),
+            ui.Label({"ID": "Details", "Text": "Click a file to inspect both paths.", "Weight": 0,
+                      "WordWrap": True, "MinimumSize": [200, 60], "MaximumSize": [1100, 95]}),
+            ui.HGroup({"Weight": 0, "Spacing": 8}, [
+                ui.Button({"ID": "Confirm", "Text": "Approve Selection", "MaximumSize": [160, 32]}),
+                ui.Button({"ID": "Skip", "Text": "Leave for Manual", "MaximumSize": [160, 32]}),
+                ui.Button({"ID": "ConfirmExact", "Text": "Approve All Exact", "MaximumSize": [160, 32]}),
+                ui.Button({"ID": "Reset", "Text": "Clear Selection Choices", "MaximumSize": [185, 32]}),
+                ui.Label({"ID": "ToolbarSpacer", "Text": "", "Weight": 1})
             ]),
-            ui.HGroup([
-                ui.Label({"ID": "Staged", "Text": "No changes applied.", "Weight": 1}),
-                ui.Button({"ID": "Apply", "Text": "Apply Confirmed Relinks"})
+            ui.HGroup({"Weight": 0, "Spacing": 8}, [
+                ui.Label({"ID": "Staged", "Text": "", "Weight": 1}),
+                ui.Button({"ID": "Apply", "Text": "Apply Approved Only", "MaximumSize": [185, 34]})
             ])
         ])
     )
-    items = win.GetItems()
-    tree = items["Matches"]
-    tree.SetHeaderLabels(["Choice", "Status", "Clip", "Original path", "Proposed path"])
-    try:
-        tree.SetColumnWidth(0, 105)
-        tree.SetColumnWidth(1, 160)
-        tree.SetColumnWidth(2, 190)
-        tree.SetColumnWidth(3, 300)
-        tree.SetColumnWidth(4, 300)
-    except Exception:
-        pass
-    choices = {}
-    indexed = {}
-    for index, row in enumerate(rows):
-        entry = tree.NewItem()
-        entry.Text[0] = "Pending"
-        entry.Text[1] = row["status"]
-        entry.Text[2] = row["name"]
-        entry.Text[3] = row.get("original") or ""
-        entry.Text[4] = row.get("expected") or ""
-        if row["status"] == "ready":
-            entry.Text[0] = "Exact"
-        elif row["status"] == "suggested_review":
-            entry.Text[0] = "Review"
-        elif row["status"] in ("already_online",):
-            entry.Text[0] = "Online"
-        else:
-            entry.Text[0] = "Unresolved"
-        tree.AddTopLevelItem(entry)
-        indexed[index] = entry
-
-    active = {"index": None}
-
-    def selected_index():
-        # Fusion's TreeItem wrappers can change identity between callbacks.
-        # Prefer its positional index rather than comparing Python objects.
+    widgets = win.GetItems()
+    tree = widgets["Matches"]
+    tree.SetHeaderLabels(["Decision", "Match", "Filename", "Original path", "Suggested local path"])
+    for column, width in enumerate([125, 155, 195, 300, 350]):
         try:
-            selected = tree.SelectedItems()
-            if selected:
-                index = tree.IndexOfTopLevelItem(selected[0])
-                if isinstance(index, int) and 0 <= index < len(rows):
-                    active["index"] = index
-                    return index
+            tree.SetColumnWidth(column, width)
         except Exception:
             pass
-        return active["index"]
 
-    def summary():
-        approved = sum(1 for v in choices.values() if v == "confirm")
-        skipped = sum(1 for v in choices.values() if v == "skip")
-        eligible = sum(1 for row in rows if row["status"] == "ready")
-        items["Summary"].Text = "%d exact paths available  •  %d other entries  •  %d total" % (
-            eligible, len(rows) - eligible, len(rows))
-        items["Staged"].Text = "%d confirmed  •  %d skipped  •  nothing applied yet" % (approved, skipped)
+    def match_label(row):
+        return {
+            "ready": "Exact path",
+            "suggested_review": "Folder differs — review",
+            "original_path_unavailable": "No source path",
+            "workspace_structure_mismatch": "Outside workspace",
+            "expected_file_missing": "File not found",
+            "already_online": "Already linked",
+        }.get(row["status"], row["status"].replace("_", " "))
 
-    def update(ix, choice):
-        if ix is None or ix not in indexed:
+    def decision_label(index):
+        if index in decisions:
+            return "APPROVE" if decisions[index] == "confirm" else "MANUAL"
+        if rows[index]["status"] == "ready":
+            return "Ready"
+        if rows[index]["status"] == "suggested_review":
+            return "Needs review"
+        if rows[index]["status"] == "already_online":
+            return "Online"
+        return "Not found"
+
+    decisions = {}
+    entries = []
+    for index, row in enumerate(rows):
+        entry = tree.NewItem()
+        entry.Text[0] = decision_label(index)
+        entry.Text[1] = match_label(row)
+        entry.Text[2] = str(row["name"])
+        entry.Text[3] = str(row.get("original") or "")
+        entry.Text[4] = str(row.get("expected") or "")
+        tree.AddTopLevelItem(entry)
+        entries.append(entry)
+
+    def selected_indices():
+        indices = []
+        try:
+            selected = tree.SelectedItems() or []
+            for item in selected:
+                idx = tree.IndexOfTopLevelItem(item)
+                if isinstance(idx, int) and 0 <= idx < len(rows) and idx not in indices:
+                    indices.append(idx)
+        except Exception as error:
+            print("Unable to read table selection:", error)
+        return indices
+
+    def refresh():
+        exact = sum(row["status"] == "ready" for row in rows)
+        review = sum(row["status"] == "suggested_review" for row in rows)
+        other = len(rows) - exact - review
+        widgets["Summary"].Text = "%d exact  |  %d need approval  |  %d unavailable / other  |  %d files" % (
+            exact, review, other, len(rows))
+        approved = sum(v == "confirm" for v in decisions.values())
+        manual = sum(v == "skip" for v in decisions.values())
+        widgets["Staged"].Text = "%d approved  |  %d left for manual relinking  |  no changes until Apply" % (
+            approved, manual)
+        for index, entry in enumerate(entries):
+            entry.Text[0] = decision_label(index)
+
+    def update_choice(choice):
+        indices = selected_indices()
+        if not indices:
+            widgets["Details"].Text = "Select one or more file rows first. Use Cmd-click or Shift-click on macOS."
             return
-        row = rows[ix]
-        # Do not offer approval when an exact target does not exist.
-        if choice == "confirm" and row["status"] not in ("ready", "suggested_review"):
-            items["Details"].Text = ("Cannot confirm this entry: no verified target path. "
-                                     "Relink it manually or correct its folder structure.\n"
-                                     + str(row.get("original") or ""))
+        rejected = 0
+        for index in indices:
+            row = rows[index]
+            if choice == "confirm" and row["status"] not in ("ready", "suggested_review"):
+                rejected += 1
+                continue
+            if choice == "reset":
+                decisions.pop(index, None)
+            else:
+                decisions[index] = choice
+        refresh()
+        if rejected:
+            widgets["Details"].Text = ("%d selected files have no verified local path and cannot be approved. "
+                                       "They will remain untouched." % rejected)
+
+    def on_select(event):
+        indices = selected_indices()
+        if not indices:
             return
-        if choice == "reset":
-            choices.pop(ix, None)
+        if len(indices) > 1:
+            widgets["Details"].Text = "%d files selected. Approve or leave these files for manual relinking." % len(indices)
         else:
-            choices[ix] = choice
-        indexed[ix].Text[0] = ("Confirmed" if choice == "confirm" else
-                              "Skipped" if choice == "skip" else
-                              "Exact" if row["status"] == "ready" else
-                              "Review" if row["status"] == "suggested_review" else
-                              "Unresolved")
-        summary()
+            row = rows[indices[0]]
+            widgets["Details"].Text = ("Original: " + str(row.get("original") or "(unavailable)") +
+                "\nLocal: " + str(row.get("expected") or "(no candidate; manual relink needed)") +
+                "\nReason: " + match_label(row))
 
-    def on_select(ev):
-        ix = selected_index()
-        if ix is None:
-            try:
-                ix = tree.IndexOfTopLevelItem(ev["item"])
-                active["index"] = ix
-            except Exception:
-                pass
-        if ix is not None and ix in range(len(rows)):
-            row = rows[ix]
-            items["Details"].Text = ("Original: " + str(row.get("original") or "(unavailable)") +
-                                     "\nExpected: " + str(row.get("expected") or "(no safe match)") +
-                                     "\nStatus: " + row["status"])
+    def on_confirm(event):
+        update_choice("confirm")
 
-    def on_confirm(ev):
-        update(selected_index(), "confirm")
+    def on_skip(event):
+        update_choice("skip")
 
-    def on_skip(ev):
-        update(selected_index(), "skip")
+    def on_reset(event):
+        update_choice("reset")
 
-    def on_reset(ev):
-        update(selected_index(), "reset")
-
-    def on_exact(ev):
-        for ix, row in enumerate(rows):
+    def on_exact(event):
+        for idx, row in enumerate(rows):
             if row["status"] == "ready":
-                update(ix, "confirm")
+                decisions[idx] = "confirm"
+        refresh()
 
-    result = {"approved": None}
-    def on_apply(ev):
-        result["approved"] = [ix for ix, val in choices.items() if val == "confirm"]
+    outcome = {"approved": None}
+
+    def on_apply(event):
+        outcome["approved"] = sorted(idx for idx, choice in decisions.items() if choice == "confirm")
         dispatcher.ExitLoop()
 
-    def on_cancel(ev):
+    def on_cancel(event):
         dispatcher.ExitLoop()
 
     win.On.Matches.ItemClicked = on_select
+    win.On.Matches.ItemSelectionChanged = on_select
     win.On.Confirm.Clicked = on_confirm
     win.On.Skip.Clicked = on_skip
     win.On.Reset.Clicked = on_reset
@@ -150,8 +166,8 @@ def review_window(fusion, bmd, rows, workspace):
     win.On.Apply.Clicked = on_apply
     win.On.CloseButton.Clicked = on_cancel
     win.On.MARReview.Close = on_cancel
-    summary()
+    refresh()
     win.Show()
     dispatcher.RunLoop()
     win.Hide()
-    return result["approved"]
+    return outcome["approved"]
