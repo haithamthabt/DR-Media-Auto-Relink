@@ -12,6 +12,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Pat
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from media_auto_relink_core import target_from_source, source_looks_like_path
+from media_auto_relink_ui import review_window
 
 APP_DIR = Path.home() / ".media-auto-relink"
 CONFIG_FILE = APP_DIR / "config.json"
@@ -97,6 +98,34 @@ def report_status(item, expected, original):
     return "unverified"
 
 
+def propose_limited_candidate(source, workspace):
+    """Try a uniquely matching immediate project folder, without recursive search."""
+    from media_auto_relink_core import normalized_parts
+    parts = normalized_parts(source)
+    if len(parts) < 3:
+        return None
+    # The source project folder is usually followed by a known subdivision.
+    # Preserve this subdivision and file name; only the project name can differ.
+    folders = {"videos", "video", "vo", "assets", "audio", "music", "effects", "sfx", "sounds effects", "sound effects"}
+    candidates = []
+    for ix, part in enumerate(parts[:-1]):
+        if part.casefold() not in folders:
+            continue
+        tail = parts[ix:]
+        if not tail or ".." in tail:
+            continue
+        # Look in immediate children only, allowing differing project folder names.
+        for child in workspace.iterdir():
+            if not child.is_dir():
+                continue
+            target = child.joinpath(*tail)
+            if target.is_file():
+                candidates.append(target)
+    # A suggestion is allowed only if one unambiguous path matches.
+    unique = list(dict.fromkeys(candidates))
+    return unique[0] if len(unique) == 1 else None
+
+
 def main():
     config = configure(load_config())
     workspace_text = config.get("workspace_folder", "")
@@ -148,6 +177,12 @@ def main():
             row["status"] = "workspace_structure_mismatch"
             row["warning"] = "Original source path does not contain the configured Workspace Folder name."
             row["action"] = "Ask the editor to verify the standard workspace layout and re-export the project."
+            candidate = propose_limited_candidate(original, workspace)
+            if candidate is not None:
+                row["expected"] = str(candidate)
+                row["status"] = "suggested_review"
+                row["warning"] = "Project folder differs. User approval required."
+                groups.setdefault(str(candidate.parent), []).append((item, row, candidate, original))
             workspace_warnings.append(row)
             continue
         row["expected"] = str(expected)
@@ -171,21 +206,41 @@ def main():
         if len(failures) > 8:
             print("More diagnostic entries saved in JSON report:", len(failures) - 8)
 
-    if not config.get("preview_only", True):
-        for folder, entries in sorted(groups.items()):
+    # Review everything in one native Resolve/Fusion window.
+    approved = None
+    try:
+        bmd_api = globals().get("bmd")
+        if bmd_api is None:
             try:
-                success = bool(pool.RelinkClips([e[0] for e in entries], folder))
+                import BlackmagicFusion as bmd_api
+            except ImportError:
+                import DaVinciResolveScript as bmd_api
+        fusion = api.Fusion()
+        approved = review_window(fusion, bmd_api, rows, workspace)
+    except Exception as exc:
+        print("Native review window unavailable; no files changed:", exc)
+        approved = None
+
+    if approved is None:
+        print("Review cancelled. No files were relinked.")
+    else:
+        approved_ids = {id(rows[ix]) for ix in approved if 0 <= ix < len(rows)}
+        for folder, entries in sorted(groups.items()):
+            selected = [e for e in entries if id(e[1]) in approved_ids]
+            if not selected:
+                continue
+            try:
+                success = bool(pool.RelinkClips([e[0] for e in selected], folder))
             except Exception as exc:
                 success = False
-                for _, row, _, _ in entries:
+                for _, row, _, _ in selected:
                     row["error"] = str(exc)
-            for item, row, expected, original in entries:
-                row["status"] = (
-                    report_status(item, expected, original)
-                    if success else "api_relink_failed"
-                )
-    else:
-        print("PREVIEW MODE: No clips were changed.")
+            for item, row, expected, original in selected:
+                row["status"] = (report_status(item, expected, original)
+                                 if success else "api_relink_failed")
+        for ix, row in enumerate(rows):
+            if row["status"] in ("ready", "suggested_review"):
+                row["status"] = "skipped_or_not_confirmed"
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -193,7 +248,8 @@ def main():
     report = {
         "project": project.GetName(),
         "workspace_folder": str(workspace),
-        "preview_only": bool(config.get("preview_only", True)),
+        "review_cancelled": approved is None,
+        "preview_only": approved is None,
         "clips": rows,
         "workspace_warnings": workspace_warnings,
     }
