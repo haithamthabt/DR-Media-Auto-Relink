@@ -11,8 +11,8 @@ from datetime import datetime
 SCRIPT_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
-from media_auto_relink_core import target_from_source, source_looks_like_path
-from media_auto_relink_ui import review_window
+from modules.media_auto_relink_core import target_from_source, source_looks_like_path
+from modules.media_auto_relink_ui import review_window
 
 APP_DIR = Path.home() / ".media-auto-relink"
 CONFIG_FILE = APP_DIR / "config.json"
@@ -100,7 +100,7 @@ def report_status(item, expected, original):
 
 def propose_limited_candidate(source, workspace):
     """Try a uniquely matching immediate project folder, without recursive search."""
-    from media_auto_relink_core import normalized_parts
+    from modules.media_auto_relink_core import normalized_parts
     parts = normalized_parts(source)
     if len(parts) < 3:
         return None
