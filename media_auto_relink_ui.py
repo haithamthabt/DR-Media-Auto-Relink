@@ -21,7 +21,7 @@ def review_window(fusion, bmd, rows, workspace):
                 ui.Label({"Text": "Sort:", "MaximumSize": [36, 25]}),
                 ui.ComboBox({"ID": "Sort", "MaximumSize": [180, 28]}),
                 ui.Button({"ID": "ApproveVisible", "Text": "Approve Shown Matches", "MaximumSize": [190, 28]}),
-                ui.Button({"ID": "ClearVisible", "Text": "Undo Shown Approvals", "MaximumSize": [175, 28]})
+                ui.Button({"ID": "ClearVisible", "Text": "Reset Shown Decisions", "MaximumSize": [175, 28]})
             ]),
             ui.Tree({"ID": "Matches", "Weight": 1, "MaximumSize": [1100, 385], "SelectionMode": "ExtendedSelection",
                      "SortingEnabled": False, "AlternatingRowColors": True}),
@@ -31,7 +31,7 @@ def review_window(fusion, bmd, rows, workspace):
                 ui.Button({"ID": "Confirm", "Text": "Approve Selected", "MaximumSize": [155, 27]}),
                 ui.Button({"ID": "Skip", "Text": "Exclude Selected", "MaximumSize": [155, 27]}),
                 ui.Button({"ID": "ConfirmExact", "Text": "Approve All Exact", "MaximumSize": [155, 27]}),
-                ui.Button({"ID": "Reset", "Text": "Undo Selected", "MaximumSize": [180, 27]}),
+                ui.Button({"ID": "Reset", "Text": "Reset Selected Decisions", "MaximumSize": [180, 27]}),
                 ui.Label({"ID": "ToolbarSpacer", "Text": "", "Weight": 1})
             ]),
             ui.HGroup({"Weight": 0, "Spacing": 8}, [
@@ -231,6 +231,7 @@ def review_window(fusion, bmd, rows, workspace):
         for index in list(displayed):
             decisions.pop(index, None)
         refresh()
+        widgets["Details"].Text = "Decisions cleared for all currently shown files. No media was changed."
 
     def on_exact(event):
         for idx, row in enumerate(rows):
