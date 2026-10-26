@@ -129,21 +129,36 @@ def review_window(fusion, bmd, rows, workspace):
             entry_map[ix] = entry
 
     def selected_indices():
-        """Use only the Tree's current highlighted selection; never accumulate clicks."""
-        try:
-            prop = tree.SelectedItems
-            selected = prop() if callable(prop) else prop
-            found = []
-            for item in (selected or []):
-                index = tree.IndexOfTopLevelItem(item)
-                if isinstance(index, int) and 0 <= index < len(displayed):
-                    original = displayed[index]
-                    if original not in found:
-                        found.append(original)
+        """Read the actual visible highlight from each TreeItem.
+
+        Some Resolve/Fusion Python bridges return opaque TreeItem wrappers from
+        SelectedItems(), for which IndexOfTopLevelItem() yields no usable index.
+        The per-item Selected property is more reliable and cannot accumulate
+        stale clicks.
+        """
+        found = []
+        for ix in displayed:
+            item = entry_map.get(ix)
+            if item is None:
+                continue
+            try:
+                if bool(item.Selected):
+                    found.append(ix)
+            except Exception:
+                pass
+        if found:
             return found
+        # Fallback for UIManager builds that expose SelectedItems() only.
+        try:
+            selected = tree.SelectedItems()
+            for position in range(tree.TopLevelItemCount()):
+                item = tree.TopLevelItem(position)
+                if any(item == chosen for chosen in selected):
+                    if 0 <= position < len(displayed):
+                        found.append(displayed[position])
         except Exception as error:
-            print("Unable to read visible selection:", error)
-            return []
+            print("Media Auto Relink: selection inspection failed:", error)
+        return found
 
     def refresh():
         exact = sum(row["status"] == "ready" for row in rows)
@@ -182,7 +197,7 @@ def review_window(fusion, bmd, rows, workspace):
     def on_select(event):
         indices = selected_indices()
         if not indices:
-            widgets["Details"].Text = "No highlighted rows. Select rows in the table first."
+            widgets["Details"].Text = "0 highlighted files. Click a table row to select it."
             return
         if len(indices) > 1:
             widgets["Details"].Text = "%d highlighted files. Actions affect only these highlighted rows." % len(indices)
