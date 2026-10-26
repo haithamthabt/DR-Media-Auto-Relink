@@ -129,6 +129,7 @@ def main():
 
     rows = []
     groups = {}
+    workspace_warnings = []
     items = list(all_media_items(pool.GetRootFolder()))
     for item in items:
         original = get_original_path(item)
@@ -144,7 +145,10 @@ def main():
             continue
         expected = target_from_source(original, workspace)
         if expected is None:
-            row["status"] = "workspace_anchor_missing"
+            row["status"] = "workspace_structure_mismatch"
+            row["warning"] = "Original source path does not contain the configured Workspace Folder name."
+            row["action"] = "Ask the editor to verify the standard workspace layout and re-export the project."
+            workspace_warnings.append(row)
             continue
         row["expected"] = str(expected)
         if not expected.is_file():
@@ -191,12 +195,23 @@ def main():
         "workspace_folder": str(workspace),
         "preview_only": bool(config.get("preview_only", True)),
         "clips": rows,
+        "workspace_warnings": workspace_warnings,
     }
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     summary = {}
     for row in rows:
         summary[row["status"]] = summary.get(row["status"], 0) + 1
     print("Media Auto Relink:", json.dumps(summary, indent=2))
+    if workspace_warnings:
+        print("\\n" + "=" * 60)
+        print("WORKSPACE STRUCTURE WARNING:", len(workspace_warnings), "clips")
+        print("No automatic folder-name substitutions were made.")
+        print("Ask the editor to verify the workspace layout.")
+        for row in workspace_warnings[:10]:
+            print(" -", row["name"], "| original:", row["original"])
+        if len(workspace_warnings) > 10:
+            print("Additional warnings in report:", len(workspace_warnings) - 10)
+        print("=" * 60 + "\\n")
     print("Report:", report_path)
     print("Review unverified entries manually. Save project yourself after verification.")
 
