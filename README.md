@@ -2,7 +2,7 @@
 
 A community Python script for **DaVinci Resolve** that reconnects media when a project moves between computers, operating systems, or mounted drives.
 
-**Status:** early preview (v0.1). Test on a duplicate project first. It is not yet a packaged native Resolve panel.
+**Status:** v0.2 native review-window preview. Not yet verified in every Resolve version. Test on a duplicate project first.
 
 ## How it works
 
@@ -27,12 +27,12 @@ A clip from another project is handled the same way. Media in shared folders als
 
 ## Install
 
-1. Download `MediaAutoRelink.py` and `media_auto_relink_core.py` into the same directory.
+1. Download `MediaAutoRelink.py`, `media_auto_relink_core.py`, and `media_auto_relink_ui.py` into the same directory.
 2. Place those files in Resolve's **Utility Scripts** directory. On macOS this is typically `/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility/`. Create the directory if needed; installations may vary.
 3. Restart DaVinci Resolve and open the imported project.
 4. Use **Workspace > Scripts > MediaAutoRelink** (menu location varies by Resolve version).
-5. On first use, enter your **Workspace Folder** and optionally choose preview mode.
-6. Inspect the report, then run again with changes enabled.
+5. On first use, choose your **Workspace Folder** in Resolve's folder picker.
+6. Use the native review window to confirm individual proposed matches, skip others, or select **Confirm All Exact**. Only **Apply Confirmed Relinks** starts relinking. Cancel changes nothing.
 
 If file dialogs are unavailable in the embedded Python environment, edit `~/.media-auto-relink/config.json` manually, e.g.:
 
@@ -43,15 +43,16 @@ If file dialogs are unavailable in the embedded Python environment, edit `~/.med
 }
 ```
 
-Set `preview_only` to `false` after validating the plan. Run again whenever needed. The script never saves the Resolve project automatically.
+Version 0.2 uses the review window for confirmation rather than the old `preview_only` switch. The legacy setting may still be present but does not control the new review window. The script never saves the Resolve project automatically.
 
 ## Behavior and safeguards
 
-- Only expected paths are checked: no recursive scan.
+- Exact expected paths are checked first; for missing workspace anchors, only immediate workspace subfolders are tested against the source's relative media-folder suffix. No recursive scan.
 - Multiple clips located in the same destination folder are grouped into one `RelinkClips` call.
 - Clips whose originals do not expose a usable path are explicitly reported.
 - Existing online clips are skipped when their original path exists.
 - Relink API return values are checked; a successful call **does not prove** that every clip became online, so the report re-checks clip paths afterward.
+- Review decisions are staged until **Apply Confirmed Relinks**; cancel applies nothing.
 - Reports are saved as JSON under `~/.media-auto-relink/reports/`.
 - No automatic file replacement, deletion, proxy relinking, Fusion relinking, or DRP rewriting.
 - Some effects, fonts, plug-ins, generators, and Fusion file loaders do not appear as ordinary media-pool clips and are not covered yet.
@@ -73,3 +74,9 @@ Contributions and issue reports welcome. Include Resolve edition/version, OS, sa
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Version 0.2 review window
+
+The bundled `media_auto_relink_ui.py` displays a native Resolve/Fusion review window. Select a clip to inspect its original and proposed paths, then click **Confirm Selected**, **Skip Selected**, or **Confirm All Exact**. **Apply Confirmed Relinks** performs relinking for approved entries only. **Cancel** exits without applying changes. Matches with missing targets cannot be confirmed. A proposed candidate with a differently named project folder always requires individual approval.
+
+**Testing status:** The window and scripting integration are committed but have not been run inside the user's Resolve installation. API or event adjustments may be needed depending on installed Resolve version. When the dialog is unavailable, the script reports the problem and does not relink clips.
