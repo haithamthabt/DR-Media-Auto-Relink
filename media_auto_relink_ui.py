@@ -4,6 +4,8 @@ All choices are staged. Apply only passes explicitly approved indices to caller.
 """
 
 def review_window(fusion, bmd, rows, workspace):
+    import os
+    from pathlib import Path
     ui = fusion.UIManager
     dispatcher = bmd.UIDispatcher(ui)
     win = dispatcher.AddWindow(
@@ -19,7 +21,8 @@ def review_window(fusion, bmd, rows, workspace):
                 ui.Label({"Text": "Show:", "MaximumSize": [42, 25]}),
                 ui.ComboBox({"ID": "Filter", "MaximumSize": [185, 28]}),
                 ui.Button({"ID": "ApproveVisible", "Text": "Approve Shown Matches", "MaximumSize": [190, 28]}),
-                ui.Button({"ID": "ClearVisible", "Text": "Reset Shown Decisions", "MaximumSize": [175, 28]})
+                ui.Button({"ID": "ClearVisible", "Text": "Reset Shown Decisions", "MaximumSize": [175, 28]}),
+                ui.Button({"ID": "Locate", "Text": "Locate in Folder...", "MaximumSize": [160, 28]})
             ]),
             ui.Tree({"ID": "Matches", "Weight": 1, "MaximumSize": [1100, 385], "SelectionMode": "ExtendedSelection",
                      "SortingEnabled": False, "AlternatingRowColors": True}),
@@ -51,6 +54,8 @@ def review_window(fusion, bmd, rows, workspace):
         return {
             "ready": "Exact path",
             "suggested_review": "Folder differs — review",
+            "located_review": "Found in selected folder — review",
+            "multiple_candidates": "Multiple matches — manual",
             "original_path_unavailable": "No source path",
             "workspace_structure_mismatch": "Outside workspace",
             "expected_file_missing": "File not found",
@@ -62,7 +67,7 @@ def review_window(fusion, bmd, rows, workspace):
             return "APPROVE" if decisions[index] == "confirm" else "MANUAL"
         if rows[index]["status"] == "ready":
             return "Ready"
-        if rows[index]["status"] == "suggested_review":
+        if rows[index]["status"] in ("suggested_review", "located_review"):
             return "Needs review"
         if rows[index]["status"] == "already_online":
             return "Online"
@@ -81,11 +86,11 @@ def review_window(fusion, bmd, rows, workspace):
         row = rows[index]
         which = widgets["Filter"].CurrentIndex
         if which == 1:
-            return row["status"] == "suggested_review"
+            return row["status"] in ("suggested_review", "located_review")
         if which == 2:
             return row["status"] == "ready"
         if which == 3:
-            return row["status"] not in ("ready", "suggested_review", "already_online")
+            return row["status"] not in ("ready", "suggested_review", "located_review", "already_online")
         if which == 4:
             return row["status"] == "already_online"
         if which == 5:
@@ -142,7 +147,7 @@ def review_window(fusion, bmd, rows, workspace):
 
     def refresh():
         exact = sum(row["status"] == "ready" for row in rows)
-        review = sum(row["status"] == "suggested_review" for row in rows)
+        review = sum(row["status"] in ("suggested_review", "located_review") for row in rows)
         other = len(rows) - exact - review
         widgets["Summary"].Text = "%d exact  |  %d need approval  |  %d unavailable / other  |  %d files" % (
             exact, review, other, len(rows))
@@ -162,7 +167,7 @@ def review_window(fusion, bmd, rows, workspace):
         rejected = 0
         for index in indices:
             row = rows[index]
-            if choice == "confirm" and row["status"] not in ("ready", "suggested_review"):
+            if choice == "confirm" and row["status"] not in ("ready", "suggested_review", "located_review"):
                 rejected += 1
                 continue
             if choice == "reset":
@@ -217,9 +222,49 @@ def review_window(fusion, bmd, rows, workspace):
 
     def on_approve_visible(event):
         for index in list(displayed):
-            if rows[index]["status"] in ("ready", "suggested_review"):
+            if rows[index]["status"] in ("ready", "suggested_review", "located_review"):
                 decisions[index] = "confirm"
         refresh()
+
+    def on_locate(event):
+        chosen = selected_indices()
+        targets = chosen if chosen else [
+            ix for ix in displayed
+            if rows[ix]["status"] not in ("ready", "already_online", "suggested_review", "located_review")
+        ]
+        if not targets:
+            widgets["Details"].Text = "Select missing files or choose Show: Not found / other."
+            return
+        folder = fusion.RequestDir()
+        if not folder:
+            return
+        root = Path(str(folder)).expanduser()
+        if not root.is_dir():
+            widgets["Details"].Text = "Selected folder is unavailable."
+            return
+        matches = {}
+        for current, dirs, files in os.walk(str(root), followlinks=False):
+            for filename in files:
+                matches.setdefault(filename.casefold(), []).append(Path(current) / filename)
+        matched, ambiguous = 0, 0
+        for ix in targets:
+            row = rows[ix]
+            if row["status"] in ("ready", "already_online", "suggested_review", "located_review"):
+                continue
+            candidates = matches.get(str(row["name"]).casefold(), [])
+            if len(candidates) == 1:
+                row["expected"] = str(candidates[0])
+                row["status"] = "located_review"
+                row["warning"] = "Found by filename in selected folder. Approval required."
+                decisions.pop(ix, None)
+                matched += 1
+            elif len(candidates) > 1:
+                row["status"] = "multiple_candidates"
+                row["warning"] = "Multiple files share this filename. No automatic choice made."
+                ambiguous += 1
+        fill_table()
+        refresh()
+        widgets["Details"].Text = "%d found; %d ambiguous. Review paths before approval." % (matched, ambiguous)
 
     def on_clear_visible(event):
         for index in list(displayed):
@@ -246,6 +291,7 @@ def review_window(fusion, bmd, rows, workspace):
     win.On.Matches.HeaderSectionClicked = on_header
     win.On.ApproveVisible.Clicked = on_approve_visible
     win.On.ClearVisible.Clicked = on_clear_visible
+    win.On.Locate.Clicked = on_locate
     win.On.Matches.ItemClicked = on_select
     win.On.Matches.ItemSelectionChanged = on_select
     win.On.Confirm.Clicked = on_confirm
