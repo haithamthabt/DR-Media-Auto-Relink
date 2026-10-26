@@ -153,6 +153,20 @@ def main():
         row["status"] = "ready"
         groups.setdefault(str(expected.parent), []).append((item, row, expected, original))
 
+    # Preview diagnostics: show a few source paths to troubleshoot root mismatch.
+    # No recursive disk search and no automatic guesses about filename matches.
+    if config.get("preview_only", True):
+        print("Workspace selected:", str(workspace))
+        failures = [r for r in rows if r["status"] in (
+            "workspace_anchor_missing", "original_path_unavailable",
+            "expected_file_missing")]
+        for row in failures[:8]:
+            print("Diagnostic:", row["status"], "| clip:", repr(row["name"]),
+                  "| original:", repr(row["original"]),
+                  "| expected:", repr(row["expected"]))
+        if len(failures) > 8:
+            print("More diagnostic entries saved in JSON report:", len(failures) - 8)
+
     if not config.get("preview_only", True):
         for folder, entries in sorted(groups.items()):
             try:
