@@ -80,3 +80,18 @@ MIT. See [LICENSE](LICENSE).
 The bundled `media_auto_relink_ui.py` displays a native Resolve/Fusion review window. Select a clip to inspect its original and proposed paths, then click **Confirm Selected**, **Skip Selected**, or **Confirm All Exact**. **Apply Confirmed Relinks** performs relinking for approved entries only. **Cancel** exits without applying changes. Matches with missing targets cannot be confirmed. A proposed candidate with a differently named project folder always requires individual approval.
 
 **Testing status:** The window and scripting integration are committed but have not been run inside the user's Resolve installation. API or event adjustments may be needed depending on installed Resolve version. When the dialog is unavailable, the script reports the problem and does not relink clips.
+
+### Review interface (v0.2.1)
+
+- The review table fills the window; action buttons use compact fixed dimensions.
+- Select multiple file rows with Command-click or Shift-click on macOS (where supported by your Resolve version).
+- **Approve Selection:** stage only selected clips with an existing exact or suggested destination.
+- **Leave for Manual:** mark selected clips to remain offline; they are not relinked.
+- **Approve All Exact:** stage only clips whose full relative workspace paths match and whose target files exist. Suggested mismatches are excluded.
+- **Clear Selection Choices:** clear decisions for selected rows.
+- **Apply Approved Only:** relink approved clips only. Unapproved, manually deferred, and unavailable clips remain untouched.
+- **Cancel:** apply nothing.
+
+“Not found” means there is no validated local target. It does **not** necessarily mean the file is missing from the computer; it may be an unexposed Resolve path or a different directory structure.
+
+This native UI code still needs validation in a running Resolve installation; its event support varies by version.
