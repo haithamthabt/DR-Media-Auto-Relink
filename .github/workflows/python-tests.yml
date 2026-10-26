@@ -12,6 +12,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Syntax check
-        run: python -m compileall -q MediaAutoRelink.py media_auto_relink_core.py media_auto_relink_ui.py tests
+        run: python -m compileall -q MediaAutoRelink.py modules tests
       - name: Regression tests
         run: python -m unittest discover -s tests -v
