@@ -8,36 +8,36 @@ def review_window(fusion, bmd, rows, workspace):
     dispatcher = bmd.UIDispatcher(ui)
     win = dispatcher.AddWindow(
         {"ID": "MARReview", "WindowTitle": "Media Auto Relink — Review",
-         "Geometry": [100, 100, 1200, 720], "MinimumSize": [850, 540]},
-        ui.VGroup({"Spacing": 6, "Margin": 10}, [
+         "Geometry": [35, 35, 1040, 590], "MinimumSize": [760, 480]},
+        ui.VGroup({"Spacing": 4, "Margin": 8}, [
             ui.HGroup({"Weight": 0, "Spacing": 8}, [
                 ui.Label({"ID": "WorkspaceLabel", "Text": "Workspace: " + str(workspace), "Weight": 1}),
-                ui.Button({"ID": "CloseButton", "Text": "Cancel", "MaximumSize": [90, 30]})
+                ui.Button({"ID": "CloseButton", "Text": "Cancel", "MaximumSize": [100, 26]})
             ]),
-            ui.Label({"ID": "Summary", "Text": "", "Weight": 0, "MaximumSize": [1100, 28]}),
+            ui.Label({"ID": "Summary", "Text": "", "Weight": 0, "MaximumSize": [1000, 22]}),
             ui.Label({"ID": "Hint", "Text": "Select one or more rows (Cmd-click / Shift-click), then Approve or Leave for manual relinking.",
-                      "Weight": 0, "MaximumSize": [1100, 25]}),
+                      "Weight": 0, "MaximumSize": [1000, 22]}),
             ui.Tree({"ID": "Matches", "Weight": 1, "SelectionMode": "ExtendedSelection",
                      "SortingEnabled": False, "AlternatingRowColors": True}),
             ui.Label({"ID": "Details", "Text": "Click a file to inspect both paths.", "Weight": 0,
-                      "WordWrap": True, "MinimumSize": [200, 60], "MaximumSize": [1100, 95]}),
+                      "WordWrap": True, "MinimumSize": [200, 45], "MaximumSize": [1000, 65]}),
             ui.HGroup({"Weight": 0, "Spacing": 8}, [
-                ui.Button({"ID": "Confirm", "Text": "Approve Selection", "MaximumSize": [160, 32]}),
-                ui.Button({"ID": "Skip", "Text": "Leave for Manual", "MaximumSize": [160, 32]}),
-                ui.Button({"ID": "ConfirmExact", "Text": "Approve All Exact", "MaximumSize": [160, 32]}),
-                ui.Button({"ID": "Reset", "Text": "Clear Selection Choices", "MaximumSize": [185, 32]}),
+                ui.Button({"ID": "Confirm", "Text": "Approve Selection", "MaximumSize": [155, 27]}),
+                ui.Button({"ID": "Skip", "Text": "Leave for Manual", "MaximumSize": [155, 27]}),
+                ui.Button({"ID": "ConfirmExact", "Text": "Approve All Exact", "MaximumSize": [155, 27]}),
+                ui.Button({"ID": "Reset", "Text": "Clear Selection Choices", "MaximumSize": [180, 27]}),
                 ui.Label({"ID": "ToolbarSpacer", "Text": "", "Weight": 1})
             ]),
             ui.HGroup({"Weight": 0, "Spacing": 8}, [
                 ui.Label({"ID": "Staged", "Text": "", "Weight": 1}),
-                ui.Button({"ID": "Apply", "Text": "Apply Approved Only", "MaximumSize": [185, 34]})
+                ui.Button({"ID": "Apply", "Text": "Apply Approved Only", "MaximumSize": [185, 28]})
             ])
         ])
     )
     widgets = win.GetItems()
     tree = widgets["Matches"]
     tree.SetHeaderLabels(["Decision", "Match", "Filename", "Original path", "Suggested local path"])
-    for column, width in enumerate([125, 155, 195, 300, 350]):
+    for column, width in enumerate([110, 145, 190, 265, 300]):
         try:
             tree.SetColumnWidth(column, width)
         except Exception:
