@@ -50,8 +50,10 @@ def review_window(fusion, bmd, rows, workspace):
         entry.Text[2] = row["name"]
         entry.Text[3] = row.get("original") or ""
         entry.Text[4] = row.get("expected") or ""
-        if row["status"] in ("ready", "suggested_review"):
+        if row["status"] == "ready":
             entry.Text[0] = "Exact"
+        elif row["status"] == "suggested_review":
+            entry.Text[0] = "Review"
         elif row["status"] in ("already_online",):
             entry.Text[0] = "Online"
         else:
@@ -59,19 +61,21 @@ def review_window(fusion, bmd, rows, workspace):
         tree.AddTopLevelItem(entry)
         indexed[index] = entry
 
+    active = {"index": None}
+
     def selected_index():
+        # Fusion's TreeItem wrappers can change identity between callbacks.
+        # Prefer its positional index rather than comparing Python objects.
         try:
             selected = tree.SelectedItems()
-            if not selected:
-                return None
-            choice = selected[0]
-            for ix, obj in indexed.items():
-                if obj is choice:
-                    return ix
-            # UIManager may proxy TreeItems; index lookup is also supported.
-            return tree.IndexOfTopLevelItem(choice)
+            if selected:
+                index = tree.IndexOfTopLevelItem(selected[0])
+                if isinstance(index, int) and 0 <= index < len(rows):
+                    active["index"] = index
+                    return index
         except Exception:
-            return None
+            pass
+        return active["index"]
 
     def summary():
         approved = sum(1 for v in choices.values() if v == "confirm")
@@ -91,12 +95,25 @@ def review_window(fusion, bmd, rows, workspace):
                                      "Relink it manually or correct its folder structure.\n"
                                      + str(row.get("original") or ""))
             return
-        choices[ix] = choice
-        indexed[ix].Text[0] = "Confirmed" if choice == "confirm" else "Skipped" if choice == "skip" else "Pending"
+        if choice == "reset":
+            choices.pop(ix, None)
+        else:
+            choices[ix] = choice
+        indexed[ix].Text[0] = ("Confirmed" if choice == "confirm" else
+                              "Skipped" if choice == "skip" else
+                              "Exact" if row["status"] == "ready" else
+                              "Review" if row["status"] == "suggested_review" else
+                              "Unresolved")
         summary()
 
     def on_select(ev):
         ix = selected_index()
+        if ix is None:
+            try:
+                ix = tree.IndexOfTopLevelItem(ev["item"])
+                active["index"] = ix
+            except Exception:
+                pass
         if ix is not None and ix in range(len(rows)):
             row = rows[ix]
             items["Details"].Text = ("Original: " + str(row.get("original") or "(unavailable)") +
