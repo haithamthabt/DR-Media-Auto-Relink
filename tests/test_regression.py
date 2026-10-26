@@ -1,7 +1,7 @@
 import unittest
 import tempfile
 from pathlib import Path
-from media_auto_relink_core import normalized_parts, workspace_relative, target_from_source, source_looks_like_path
+from modules.media_auto_relink_core import normalized_parts, workspace_relative, target_from_source, source_looks_like_path
 
 class PathTests(unittest.TestCase):
     def setUp(self):
