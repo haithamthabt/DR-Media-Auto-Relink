@@ -235,6 +235,11 @@ def main():
             if not expected.is_file():
                 row["status"] = "expected_file_missing"
                 continue
+            original_name = row.get("original", "").replace(chr(92), "/").split("/")[-1].casefold()
+            if expected.name.casefold() not in {row["name"].casefold(), original_name}:
+                row["status"] = "filename_mismatch"
+                continue
+            apply_groups.setdefault(str(expected.parent), []).append(
                 (items[ix], row, expected, row.get("original", ""))
             )
         for folder, selected in sorted(apply_groups.items()):
