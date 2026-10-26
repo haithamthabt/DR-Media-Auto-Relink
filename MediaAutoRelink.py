@@ -4,9 +4,13 @@ Early preview. Operates only on Media Pool clips. Does not auto-save.
 """
 import json
 import os
+import sys
 from pathlib import Path
 from datetime import datetime
 
+SCRIPT_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 from media_auto_relink_core import target_from_source, source_looks_like_path
 
 APP_DIR = Path.home() / ".media-auto-relink"
