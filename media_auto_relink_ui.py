@@ -73,6 +73,7 @@ def review_window(fusion, bmd, rows, workspace):
     decisions = {}
     entry_map = {}
     displayed = []
+    selected_cache = set()
     filter_choices = ["All files", "Needs review", "Exact matches", "Not found / other", "Already linked", "Approved", "Excluded"]
     sort_choices = ["Status", "Decision", "Filename", "Original path", "Suggested path"]
     for label in filter_choices:
@@ -114,6 +115,7 @@ def review_window(fusion, bmd, rows, workspace):
 
     def fill_table():
         # Rebuild on filter or sort changes; decisions remain keyed to original indices.
+        selected_cache.clear()
         tree.Clear()
         entry_map.clear()
         displayed[:] = sorted((ix for ix in range(len(rows)) if included(ix)), key=order_key)
@@ -129,18 +131,24 @@ def review_window(fusion, bmd, rows, workspace):
             entry_map[ix] = entry
 
     def selected_indices():
-        indices = []
+        # Fusion UIManager exposes SelectedItems as a property on macOS,
+        # not necessarily a method. Preserve the selection when a button
+        # temporarily takes focus away from the tree.
         try:
-            selected = tree.SelectedItems() or []
-            for item in selected:
-                idx = tree.IndexOfTopLevelItem(item)
-                if isinstance(idx, int) and 0 <= idx < len(displayed):
-                    original_index = displayed[idx]
-                    if original_index not in indices:
-                        indices.append(original_index)
+            attr = tree.SelectedItems
+            selected = attr() if callable(attr) else attr
+            if selected:
+                found = []
+                for item in selected:
+                    position = tree.IndexOfTopLevelItem(item)
+                    if isinstance(position, int) and 0 <= position < len(displayed):
+                        found.append(displayed[position])
+                if found:
+                    selected_cache.clear()
+                    selected_cache.update(found)
         except Exception as error:
             print("Unable to read table selection:", error)
-        return indices
+        return sorted(selected_cache)
 
     def refresh():
         exact = sum(row["status"] == "ready" for row in rows)
@@ -152,7 +160,9 @@ def review_window(fusion, bmd, rows, workspace):
         manual = sum(v == "skip" for v in decisions.values())
         widgets["Staged"].Text = "%d approved  |  %d left for manual relinking  |  no changes until Apply" % (
             approved, manual)
-        fill_table()
+        # Updating decisions should not erase highlighted table selections.
+        for index, entry in entry_map.items():
+            entry.Text[0] = decision_label(index)
 
     def update_choice(choice):
         indices = selected_indices()
@@ -175,6 +185,16 @@ def review_window(fusion, bmd, rows, workspace):
                                        "They will remain untouched." % rejected)
 
     def on_select(event):
+        # Click event provides a fallback when selection property is empty.
+        if isinstance(event, dict):
+            item = event.get("item")
+            if item is not None:
+                try:
+                    position = tree.IndexOfTopLevelItem(item)
+                    if isinstance(position, int) and 0 <= position < len(displayed):
+                        selected_cache.add(displayed[position])
+                except Exception:
+                    pass
         indices = selected_indices()
         if not indices:
             return
@@ -240,6 +260,7 @@ def review_window(fusion, bmd, rows, workspace):
     win.On.Apply.Clicked = on_apply
     win.On.CloseButton.Clicked = on_cancel
     win.On.MARReview.Close = on_cancel
+    fill_table()
     refresh()
     win.Show()
     dispatcher.RunLoop()
