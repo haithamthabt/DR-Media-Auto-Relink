@@ -36,25 +36,30 @@ def save_config(config):
 
 
 def configure(config):
-    """Optional setup dialogs; edit config.json if tkinter is unavailable."""
+    """Select workspace with Resolve/Fusion's own dialog (no tkinter needed)."""
     if config["workspace_folder"] and Path(config["workspace_folder"]).expanduser().is_dir():
         return config
+
+    folder = None
     try:
-        import tkinter as tk
-        from tkinter import filedialog, messagebox
-        root = tk.Tk()
-        root.withdraw()
-        folder = filedialog.askdirectory(title="Select Workspace Folder")
-        if folder:
-            config["workspace_folder"] = folder
-            config["preview_only"] = not messagebox.askyesno(
-                "Media Auto Relink", "Apply relinks now? Choose No to preview first."
-            )
-            save_config(config)
-        root.destroy()
+        api = globals().get("resolve")
+        if not api:
+            import DaVinciResolveScript as dvr
+            api = dvr.scriptapp("Resolve")
+        fusion = api.Fusion() if api else None
+        if fusion:
+            folder = fusion.RequestDir()
     except Exception as exc:
-        print("Folder dialog unavailable:", exc)
-        print("Create config at:", CONFIG_FILE)
+        print("Resolve/Fusion folder dialog unavailable:", exc)
+
+    if folder and Path(folder).is_dir():
+        config["workspace_folder"] = folder
+        # Keep preview enabled by default; user explicitly changes config for live relink.
+        config["preview_only"] = True
+        save_config(config)
+        print("Workspace Folder saved:", folder)
+    else:
+        print("No folder selected. Set Workspace Folder in:", CONFIG_FILE)
         print('Example: {"workspace_folder": "/Volumes/Media/Studio Workspace", "preview_only": true}')
     return config
 
