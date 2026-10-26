@@ -157,7 +157,6 @@ def main():
         return
 
     rows = []
-    groups = {}
     workspace_warnings = []
     items = list(all_media_items(pool.GetRootFolder()))
     for item in items:
@@ -182,15 +181,16 @@ def main():
                 row["expected"] = str(candidate)
                 row["status"] = "suggested_review"
                 row["warning"] = "Project folder differs. User approval required."
-                groups.setdefault(str(candidate.parent), []).append((item, row, candidate, original))
             workspace_warnings.append(row)
             continue
         row["expected"] = str(expected)
         if not expected.is_file():
             row["status"] = "expected_file_missing"
             continue
+        if expected.name.casefold() != original.replace(chr(92), "/").split("/")[-1].casefold():
+            row["status"] = "filename_mismatch"
+            continue
         row["status"] = "ready"
-        groups.setdefault(str(expected.parent), []).append((item, row, expected, original))
 
     # Preview diagnostics: show a few source paths to troubleshoot root mismatch.
     # No recursive disk search and no automatic guesses about filename matches.
@@ -235,7 +235,6 @@ def main():
             if not expected.is_file():
                 row["status"] = "expected_file_missing"
                 continue
-            apply_groups.setdefault(str(expected.parent), []).append(
                 (items[ix], row, expected, row.get("original", ""))
             )
         for folder, selected in sorted(apply_groups.items()):
@@ -260,6 +259,7 @@ def main():
         "workspace_folder": str(workspace),
         "review_cancelled": approved is None,
         "preview_only": approved is None,
+        "approved_count": len(approved or []),
         "clips": rows,
         "workspace_warnings": workspace_warnings,
     }
