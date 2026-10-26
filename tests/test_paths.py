@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from media_auto_relink_core import workspace_relative, target_from_source
+from modules.media_auto_relink_core import workspace_relative, target_from_source
 
 
 class PathMappingTests(unittest.TestCase):
