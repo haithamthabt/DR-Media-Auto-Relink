@@ -13,10 +13,14 @@ def review_window(fusion, bmd, rows, workspace):
          "Geometry": [40, 35, 1120, 660], "MinimumSize": [800, 510]},
         ui.VGroup({"Spacing": 4, "Margin": 8}, [
             ui.HGroup({"Weight": 0, "Spacing": 8}, [
-                ui.Label({"ID": "WorkspaceLabel", "Text": "Workspace: " + str(workspace), "Weight": 1}),
-                ui.Button({"ID": "CloseButton", "Text": "Cancel", "MaximumSize": [100, 26]})
+                ui.Label({"ID": "WorkspaceLabel", "Text": "Workspace: " + str(workspace), "Weight": 1})
             ]),
             ui.Label({"ID": "Summary", "Text": "", "Weight": 0, "MaximumSize": [1000, 22]}),
+            ui.HGroup({"Weight": 0, "Spacing": 8}, [
+                ui.Button({"ID": "Apply", "Text": "Apply Approved Files", "MaximumSize": [185, 30]}),
+                ui.Button({"ID": "CloseButton", "Text": "Cancel", "MaximumSize": [100, 30]}),
+                ui.Label({"ID": "Staged", "Text": "", "Weight": 1})
+            ]),
             ui.HGroup({"Weight": 0, "Spacing": 6}, [
                 ui.Label({"Text": "Show:", "MaximumSize": [42, 25]}),
                 ui.ComboBox({"ID": "Filter", "MaximumSize": [185, 28]}),
@@ -34,10 +38,6 @@ def review_window(fusion, bmd, rows, workspace):
                 ui.Button({"ID": "ConfirmExact", "Text": "Approve All Exact", "MaximumSize": [155, 27]}),
                 ui.Button({"ID": "Reset", "Text": "Reset Selected Decisions", "MaximumSize": [180, 27]}),
                 ui.Label({"ID": "ToolbarSpacer", "Text": "", "Weight": 1})
-            ]),
-            ui.HGroup({"Weight": 0, "Spacing": 8}, [
-                ui.Label({"ID": "Staged", "Text": "", "Weight": 1}),
-                ui.Button({"ID": "Apply", "Text": "Apply Approved Files", "MaximumSize": [185, 28]})
             ])
         ])
     )
