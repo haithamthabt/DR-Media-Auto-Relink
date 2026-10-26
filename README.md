@@ -95,3 +95,9 @@ The bundled `media_auto_relink_ui.py` displays a native Resolve/Fusion review wi
 “Not found” means there is no validated local target. It does **not** necessarily mean the file is missing from the computer; it may be an unexposed Resolve path or a different directory structure.
 
 This native UI code still needs validation in a running Resolve installation; its event support varies by version.
+
+### Bulk review and sorting (v0.2.2)
+
+Use **Show: Needs review** to display only proposed matches requiring approval. **Approve Shown Matches** stages every visible file with an existing suggested or exact destination. Select an individual row and choose **Undo Selected** to remove its approval (or **Exclude Selected** to leave it for manual relinking). **Apply Approved Files** changes only approved items. The **Show** dropdown can also filter exact paths, missing/other, online, approved, and excluded items. The **Sort** dropdown orders by status, decision, filename, original path, or suggested path. Changing filters or sorting does not discard prior choices. No full-disk scan is performed.
+
+Note: Files without a valid suggested path cannot be approved from this dialog; they remain available for manual relinking.
