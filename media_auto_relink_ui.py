@@ -18,8 +18,6 @@ def review_window(fusion, bmd, rows, workspace):
             ui.HGroup({"Weight": 0, "Spacing": 6}, [
                 ui.Label({"Text": "Show:", "MaximumSize": [42, 25]}),
                 ui.ComboBox({"ID": "Filter", "MaximumSize": [185, 28]}),
-                ui.Label({"Text": "Sort:", "MaximumSize": [36, 25]}),
-                ui.ComboBox({"ID": "Sort", "MaximumSize": [180, 28]}),
                 ui.Button({"ID": "ApproveVisible", "Text": "Approve Shown Matches", "MaximumSize": [190, 28]}),
                 ui.Button({"ID": "ClearVisible", "Text": "Reset Shown Decisions", "MaximumSize": [175, 28]})
             ]),
@@ -74,13 +72,10 @@ def review_window(fusion, bmd, rows, workspace):
     entry_map = {}
     displayed = []
     filter_choices = ["All files", "Needs review", "Exact matches", "Not found / other", "Already linked", "Approved", "Excluded"]
-    sort_choices = ["Status", "Decision", "Filename", "Original path", "Suggested path"]
     for label in filter_choices:
         widgets["Filter"].AddItem(label)
-    for label in sort_choices:
-        widgets["Sort"].AddItem(label)
     widgets["Filter"].CurrentIndex = 0
-    widgets["Sort"].CurrentIndex = 0
+    sorting = {"column": 1, "descending": False}
 
     def included(index):
         row = rows[index]
@@ -101,22 +96,22 @@ def review_window(fusion, bmd, rows, workspace):
 
     def order_key(index):
         row = rows[index]
-        key = widgets["Sort"].CurrentIndex
-        if key == 1:
+        column = sorting["column"]
+        if column == 0:
             return (decision_label(index).casefold(), row["name"].casefold())
-        if key == 2:
+        if column == 1:
+            return (match_label(row).casefold(), row["name"].casefold())
+        if column == 2:
             return (row["name"].casefold(), index)
-        if key == 3:
+        if column == 3:
             return (str(row.get("original") or "").casefold(), index)
-        if key == 4:
-            return (str(row.get("expected") or "").casefold(), index)
-        return (match_label(row).casefold(), row["name"].casefold())
+        return (str(row.get("expected") or "").casefold(), index)
 
     def fill_table():
         # Rebuild on filter or sort changes; decisions remain keyed to original indices.
         tree.Clear()
         entry_map.clear()
-        displayed[:] = sorted((ix for ix in range(len(rows)) if included(ix)), key=order_key)
+        displayed[:] = sorted((ix for ix in range(len(rows)) if included(ix)), key=order_key, reverse=sorting["descending"])
         for ix in displayed:
             row = rows[ix]
             entry = tree.NewItem()
@@ -204,8 +199,21 @@ def review_window(fusion, bmd, rows, workspace):
     def on_filter(event):
         fill_table()
 
-    def on_sort(event):
+    def on_header(event):
+        try:
+            column = event.get("index", event.get("column")) if isinstance(event, dict) else None
+            column = int(column)
+        except (ValueError, TypeError):
+            return
+        if not 0 <= column <= 4:
+            return
+        if sorting["column"] == column:
+            sorting["descending"] = not sorting["descending"]
+        else:
+            sorting["column"] = column
+            sorting["descending"] = False
         fill_table()
+
 
     def on_approve_visible(event):
         for index in list(displayed):
@@ -235,7 +243,7 @@ def review_window(fusion, bmd, rows, workspace):
         dispatcher.ExitLoop()
 
     win.On.Filter.CurrentIndexChanged = on_filter
-    win.On.Sort.CurrentIndexChanged = on_sort
+    win.On.Matches.HeaderSectionClicked = on_header
     win.On.ApproveVisible.Clicked = on_approve_visible
     win.On.ClearVisible.Clicked = on_clear_visible
     win.On.Matches.ItemClicked = on_select
